@@ -16,11 +16,13 @@
 #define inputhall (~PINA & 0x01)
 unsigned char vehicle_speed = 0;
 unsigned char desired_speed = 0;
+unsigned char desired_pwm = 0;
 unsigned long cnt = 0;
+unsigned long cntt = 0;
 unsigned char i = 0;
 unsigned char userinput = 0;
 //unsigned char spd = 210;
-unsigned char go_spd = 210;
+unsigned char go_spd = 230;
 
 
 enum Hall_State{wait, read}hall_state;
@@ -74,34 +76,38 @@ void Hall_Sensor_Calc(){
 }
 
 //0 fastest, 255 is off
-enum Drive_State{drive, received}drive_state;
+enum Drive_State{waitt, drive, received}drive_state;
 void Drive_Motor(){
 	switch(drive_state){
-		case drive:
+		case waitt:
+		if (cntt < 30000){
+			cntt = cntt + 1;
+		}
+		else{
+			drive_state = drive;
+		}
 		if(USART_HasReceived(0)){
 			drive_state = received;
 		}
+		break;
 		
-		desired_speed = (3*userinput)/(2*3.14159*.032*100);
-		if(go_spd <= 3){
-			go_spd = 4;
-		}
-		else if(go_spd >= 250){
-			go_spd = 240;
-		}
+		case drive:
+		//desired_speed = (3*userinput)/(2*3.14159*.032*100);
+		desired_speed = (3*userinput)/(2*3*.03*100);
 		
-		if((go_spd > 3) && (go_spd < 250)){
-			//Speed Up
-			//must make sure to not pass 0
-			if(desired_speed > vehicle_speed){
-				go_spd = go_spd - 1;
-			}
-			//Slow Down
-			//make sure to not pass 255
-			else if(desired_speed < vehicle_speed){
-				go_spd = go_spd + 1;
-			}
+		//Speed Up
+		//must make sure to not pass 0
+		if(desired_speed > vehicle_speed){
+			go_spd = go_spd - 1;
 		}
+		//Slow Down
+		//make sure to not pass 255
+		else if(desired_speed < vehicle_speed){
+			go_spd = go_spd + 1;
+		}
+		PORTC = go_spd;
+		cntt = 0;
+		drive_state = waitt;
 		
 		M1_forward(go_spd);
 		break;
@@ -109,11 +115,10 @@ void Drive_Motor(){
 		case received:
 		userinput = USART_Receive(0);
 		USART_Send(0x03,0);
-		drive_state = drive;
+		USART_Flush(0);
+		drive_state = waitt;
 		break;
 	}
-	
-	
 }
 
 //PA0 hall effect sensor
@@ -126,7 +131,6 @@ int main(void){
 	DDRD = 0xFF; PORTD = 0x00;
 	motors_init();
 	initUSART(0);
-	USART_Flush(0);
 	while(1){
 		Read_Hall_Sensor();
 		Hall_Sensor_Calc();
