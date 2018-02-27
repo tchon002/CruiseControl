@@ -23,6 +23,7 @@ unsigned char i = 0;
 unsigned char userinput = 0;
 //unsigned char spd = 210;
 unsigned char go_spd = 230;
+unsigned char manual_drive = 240;
 
 
 enum Hall_State{wait, read}hall_state;
@@ -76,7 +77,7 @@ void Hall_Sensor_Calc(){
 }
 
 //0 fastest, 255 is off
-enum Drive_State{waitt, drive, received}drive_state;
+enum Drive_State{waitt, drive, received, manual}drive_state;
 void Drive_Motor(){
 	switch(drive_state){
 		case waitt:
@@ -98,12 +99,12 @@ void Drive_Motor(){
 		//Speed Up
 		//must make sure to not pass 0
 		if(desired_speed > vehicle_speed){
-			go_spd = go_spd - 1;
+			go_spd = go_spd - 5;
 		}
 		//Slow Down
 		//make sure to not pass 255
 		else if(desired_speed < vehicle_speed){
-			go_spd = go_spd + 1;
+			go_spd = go_spd + 4;
 		}
 		PORTC = go_spd;
 		cntt = 0;
@@ -113,10 +114,36 @@ void Drive_Motor(){
 		break;
 		
 		case received:
-		userinput = USART_Receive(0);
-		USART_Send(0x03,0);
-		USART_Flush(0);
-		drive_state = waitt;
+		if(USART_Receive(0) == 0xFF){
+			drive_state = manual;
+		}
+		else{
+			userinput = USART_Receive(0);
+			USART_Flush(0);
+			drive_state = waitt;
+
+		}
+		break;
+		
+		case manual:
+		manual_drive = USART_Receive(0);
+		if(manual_drive == 0xFF){
+			M1_forward(200);
+			drive_state = manual;
+		}
+		else if(manual_drive == 0xFE){
+			M1_reverse(200);
+			drive_state = manual;
+		}
+		//240
+		else if(manual_drive = 0xF0){
+			go_spd = 230;
+			drive_state = drive;
+		}
+		else{
+			M_off();
+			drive_state = manual;
+		}
 		break;
 	}
 }
