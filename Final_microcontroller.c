@@ -14,14 +14,14 @@
 #include "C:\Users\Owner\Documents\Atmel Studio\7.0\Senior_Design\Senior_Design\PWM.h"
 #include "C:\Users\Owner\Documents\Atmel Studio\7.0\Senior_Design\Senior_Design\io.c"
 #define inputhall (~PINA & 0x01)
-unsigned char vehicle_speed = 0;
-unsigned char desired_speed = 0;
+unsigned long vehicle_speed = 0;
+unsigned long desired_speed = 0;
 unsigned char desired_pwm = 0;
 unsigned long cnt = 0;
 unsigned long cntt = 0;
-unsigned char i = 0;
+unsigned long i = 0;
 unsigned char userinput = 0;
-//unsigned char spd = 210;
+unsigned char spd = 0;
 unsigned char go_spd = 230;
 unsigned char manual_drive = 240;
 
@@ -57,7 +57,7 @@ void Hall_Sensor_Calc(){
 		//1,200,000 is about 55 seconds
 		//1,350,000 is about 1 min
 		//22,500 is about 1 second
-		if(cnt < 68000){
+		if(cnt < 25000){
 			cnt = cnt + 1;
 			calc_state = wait_min;
 		}
@@ -77,11 +77,11 @@ void Hall_Sensor_Calc(){
 }
 
 //0 fastest, 255 is off
-enum Drive_State{waitt, drive, received, manual}drive_state;
+enum Drive_State{waitt, drive, received}drive_state;
 void Drive_Motor(){
 	switch(drive_state){
 		case waitt:
-		if (cntt < 30000){
+		if (cntt < 25000){
 			cntt = cntt + 1;
 		}
 		else{
@@ -94,57 +94,59 @@ void Drive_Motor(){
 		
 		case drive:
 		//desired_speed = (3*userinput)/(2*3.14159*.032*100);
-		desired_speed = (3*userinput)/(2*3*.03*100);
+		desired_speed = userinput/4;
 		
-		//Speed Up
-		//must make sure to not pass 0
-		if(desired_speed > vehicle_speed){
-			go_spd = go_spd - 5;
+		if (userinput == 240){
+			M_off();
+			cntt = 0;
+			userinput = 0;
+			go_spd = 230;
 		}
-		//Slow Down
-		//make sure to not pass 255
-		else if(desired_speed < vehicle_speed){
-			go_spd = go_spd + 4;
+		else if(userinput == 254){
+			M1_reverse(150);
+			cntt = 0;
+			userinput = 0;
+			go_spd = 230;
 		}
-		PORTC = go_spd;
-		cntt = 0;
+		else if(userinput == 253){
+			M1_forward(150);
+			cntt = 0;
+			userinput = 0;
+			go_spd = 230;
+		}
+		else{
+			if (go_spd < 5){
+				go_spd = 4;
+			}
+			else if (go_spd > 240){
+				go_spd = 240;
+			}
+			//Speed Up
+			//must make sure to not pass 0
+			if(desired_speed > vehicle_speed){
+				go_spd = go_spd - 3;
+			}
+			//Slow Down
+			//make sure to not pass 255
+			else if(desired_speed < vehicle_speed){
+				go_spd = go_spd + 2;
+			}
+			PORTC = go_spd;
+			spd = 4*vehicle_speed;
+			USART_Send(spd, 0);
+			cntt = 0;
+			
+			M1_forward(go_spd);
+		}
 		drive_state = waitt;
-		
-		M1_forward(go_spd);
 		break;
 		
 		case received:
-		if(USART_Receive(0) == 0xFF){
-			drive_state = manual;
-		}
-		else{
-			userinput = USART_Receive(0);
-			USART_Flush(0);
-			drive_state = waitt;
+		userinput = USART_Receive(0);
 
-		}
+		drive_state = waitt;
 		break;
-		
-		case manual:
-		manual_drive = USART_Receive(0);
-		if(manual_drive == 0xFF){
-			M1_forward(200);
-			drive_state = manual;
-		}
-		else if(manual_drive == 0xFE){
-			M1_reverse(200);
-			drive_state = manual;
-		}
-		//240
-		else if(manual_drive = 0xF0){
-			go_spd = 230;
-			drive_state = drive;
-		}
-		else{
-			M_off();
-			drive_state = manual;
-		}
-		break;
+
 	}
 }
 
