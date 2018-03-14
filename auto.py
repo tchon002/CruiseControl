@@ -1,55 +1,14 @@
-import serial
-import struct
-import cv2
-import string
-import curses
-import threading
-from curses import wrapper
-from time import sleep
-import RPi.GPIO as GPIO
+"""Detect speed limits from webcam feed"""
 import re
 import os
 import sys
+import cv2
 import time
+import threading
 import argparse
 from imutils.video import VideoStream
 from imutils.video import FPS
 
-ser = serial.Serial("/dev/ttyAMA0")
-ser.close()
-ser.open()
-ser.baudrate = 9600
-
-GPIO.setmode(GPIO.BCM)
-TRIG = 23
-ECHO = 24
-#TRIG is PIN16
-#ECHO is PIN18
-GPIO.setup(TRIG,GPIO.OUT)
-GPIO.setup(ECHO,GPIO.IN)
-value = 0
-def distance_check():
-    while True:
-
-        GPIO.output(TRIG,False)
-        time.sleep(.5)
-        GPIO.output(TRIG,True)
-        time.sleep(0.00001)
-        GPIO.output(TRIG,False)
-        pulse_start = 0
-        pulse_end = 0
-        while GPIO.input(ECHO)==0:
-            pulse_start = time.time()
-        while GPIO.input(ECHO)==1:
-            pulse_end = time.time()
-            
-        pulse_duration = pulse_end - pulse_start
-        distance = pulse_duration * 17150
-        distance = round(distance)
-        #print(distance)
-        if distance < 30:
-            #ser.write(struct.pack('B',int(240)))
-            print("Found")
 
 def read_paths(path):
     """Returns a list of files in given path"""
@@ -213,9 +172,7 @@ def run_logic():
 
             if counte >= 10:
                 counte = 0
-                ser.write(struct.pack('B',int(prevdetect)))
-                
-    
+                print(prevdetect)
 
 
         if ARGS.PREVIEW:
@@ -246,9 +203,9 @@ if __name__ == "__main__":
     PARSER.add_argument("-m", "--matches", 
         dest="matches", default=10)
     PARSER.add_argument("-M", "--morphopenclose", 
-        dest="MORPH", action="store_true", default=True)
+        dest="MORPH", action="store_true", default=False)
     PARSER.add_argument("-s", "--showvid", 
-        dest="PREVIEW", action="store_true", default=True)
+        dest="PREVIEW", action="store_true", default=False)
     ARGS = PARSER.parse_args()
 
 
@@ -268,67 +225,4 @@ if __name__ == "__main__":
     if ARGS.PREVIEW:
         cv2.namedWindow("preview")
 
-
-
-def main(manual_input):
-    manual_input = curses.initscr()
-    curses.noecho()
-    curses.cbreak()
-    manual_input.keypad(True)
-    #manual_input.nodelay(1)
-    print("You are in the manual control: Forward-'w' ; Reverse-'s' ; Press 'q' 3 times to change mode")
-    while True:
-        #if value == 0:
-        if manual_input.getch() == ord('w'):
-            ser.write(struct.pack('B',int(253)))
-        elif manual_input.getch() == ord('s'):
-            ser.write(struct.pack('B',int(254)))
-        elif manual_input.getch() == ord('q'):
-            ser.write(struct.pack('B',int(240)))
-            curses.nocbreak()
-            manual_input.keypad(False)
-            curses.echo()
-            curses.endwin()
-            break
-        else:
-            ser.write(struct.pack('B',int(0)))
-
-try:
-    thread = threading.Thread(target=distance_check)
-    thread.daemon = True
-    thread.start()
-    while True:  
-        user_input = input("Please Enter Desired Mode (Manual / Input / Automatic / Quit):\n")
-        user_input = user_input.lower()
-        if user_input=="input":
-            #may need to change range of allowed inputs
-            while True:
-                user_speed = input("Please Enter Desired Speed(8-200)(cm/s) or '0' to stop(Type 'Mode' to change modes):\n");
-                #if value == 0:
-                if user_speed.isdigit():
-                    if (int(user_speed)>7 and int(user_speed)<201) or (int(user_speed)== 0):
-                        ser.write(struct.pack('B',int(user_speed)))
-                    else:
-                        print("Invalid Input. Please Try Again.\n")
-                else:
-                    if user_speed.lower()=="mode":
-                        break
-                    else:
-                        print("Invalid Input. Please Try Again.\n")
-                
-        elif user_input=="manual":
-            wrapper(main)
-        elif user_input=="automatic":
-            print("Press 'q' to quit automatic mode")
-            run_logic()
-            
-        elif user_input=="quit":
-            break
-        else:
-            print("Invalid Input. Please Try Again.\n")
-
-finally:
-    GPIO.cleanup()
-    
-    
-
+    run_logic()
