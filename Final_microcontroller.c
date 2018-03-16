@@ -119,7 +119,7 @@ void Drive_Motor(){
 				go_spd = 4;
 			}
 			else if (go_spd > 240){
-				go_spd = 240;
+				go_spd = 230;
 			}
 			//Speed Up
 			//must make sure to not pass 0
